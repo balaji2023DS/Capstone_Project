@@ -288,7 +288,6 @@ if(st.button("Data migrate from mongodb to mysql")):
     # disconnecting from server
     mysql_db_connector.close()
 
-
     #video dataframe
     pd.set_option('display.max_columns', 20)
     pd.set_option('display.width', 2000)
