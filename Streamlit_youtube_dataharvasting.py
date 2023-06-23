@@ -191,14 +191,14 @@ def get_comment_videoinfo(youtube,video_id):
     #return all_comments
 
 #########################################################################################################
-channel_ids = st.text_input('enter the channel id:').split(',')
+channel_ids = st.text_input('Enter the channel id:').split(',')
 #st.write("Channel ids:")
-st.write(channel_ids)
+#st.write(channel_ids)
 #st.write("multiselect list:")
 selected_channel_ids=st.multiselect("Select channel id", channel_ids)
 #st.write(selected_channel_ids)
 
-if(st.button('get channel details')):
+if(st.button('Get channel details')):
     for channel in selected_channel_ids:
             #st.write(channel)
             #dict_channel = {}
