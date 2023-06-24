@@ -16,6 +16,7 @@ client = pymongo.MongoClient("mongodb://127.0.0.1:27017/")
 #print(client)
 db= client['DB_Youtube']
 #db.createCollection["data_Youtube_Channel"]
+
 @st.cache_data
 #function get channel details
 def get_channel_stats(_youtube,channel_ids):
@@ -138,9 +139,9 @@ def get_video_details(youtube, video_ids):
                         PublishedAt=video['snippet']['publishedAt'],
                         View_Count=video['statistics']['viewCount'],
                         Like_Count=video['statistics']['likeCount'],
-                        # Dislike_Count= video['statistics']['dislikeCount'],
+                        #Dislike_Count= video['statistics']['dislikeCount'],
                         Favorite_Count=video['statistics']['favoriteCount'],
-                        # Comment_Count= video['statistics']['commentCount'],
+                        #Comment_Count= video['statistics']['commentCount'],
                         Duration=video['contentDetails']['duration'],
                         Thumbnail=video['snippet']['thumbnails']['default']['url'],
                         Caption_Status=video['contentDetails']['caption'],
@@ -191,7 +192,8 @@ def get_comment_videoinfo(youtube,video_id):
     #return all_comments
 
 #########################################################################################################
-channel_ids = st.text_input('Enter the channel id:').split(',')
+
+channel_ids = st.text_input('Enter the channel ids:').split(',')
 #st.write("Channel ids:")
 #st.write(channel_ids)
 #st.write("multiselect list:")
@@ -204,7 +206,6 @@ if(st.button('Get channel details')):
             #dict_channel = {}
             #dict_channel.update(get_channel_stats(youtube, channel))
             #pd_channel = pd.DataFrame([get_channel_stats(youtube, channel)])
-            #st.write(pd_channel)
             #st.write(pd_channel)
 
             total_playlist = get_playlist_info(youtube, channel)
@@ -225,6 +226,7 @@ if(st.button('Get channel details')):
             # print(video_ids)
             # all_video_stats= get_video_details(youtube,video_ids)
             video_ids = list(set(video_ids))
+
             channel_complete = {}
             channel_complete.update(Channel_Name=get_channel_stats(youtube, channel))
             channel_complete.update(get_video_details(youtube, video_ids))
@@ -232,195 +234,424 @@ if(st.button('Get channel details')):
             st.write("data inserted successfully:",db.data_Youtube_Channel.insert_one(channel_complete))
             channel_complete.clear()
 
+
+
 if(st.button("Data migrate from mongodb to mysql")):
     # channel dataframe
-    pd.set_option('display.max_columns', 20)
-    pd.set_option('display.width', 2000)
-    list_channel_cur = []
-    channel_coll = db.data_Youtube_Channel.find({})
-    for document in channel_coll:
-        channel = {"Channel_Name": document['Channel_Name']['Channel_Name'],
-                   "Channel_Id": document['Channel_Name']['Channel_Id'],
-                   "Subscription_Count": document['Channel_Name']['Subscription_Count'],
-                   "Channel_Views": document['Channel_Name']['Channel_Views'],
-                   "Channel_Description": document['Channel_Name']['Channel_Description']
-                   # "Playlist_Id" : document['Channel_Name']['Playlist_Id']
-                   }
-        list_channel_cur.append(channel)
-    # print(f"Channel Name: {channel_name}")
-    # print(f"Channel Id: {channel_id}")
-    # print(f"Subscription Count: {subscription_count}")
-    # print(f"Channel Views: {channel_views}")
-    # print(f"Channel Description: {channel_description}")
-    # print(f"Playlist Id: {playlist_id}")
-    # print(list_channel_cur)
-    # # # Converting to the DataFrame
-    df_channel = pd.DataFrame(list_channel_cur)
-    # print(df_channel)
-    # df_channel.drop(df_channel.columns[5], axis=1, inplace=True)
-    # print(df_channel)
+    for Channel_Id in selected_channel_ids:
+        #st.write(Channel_Id)
+        pd.set_option('display.max_columns', 20)
+        pd.set_option('display.width', 2000)
+        list_channel_cur = []
+        #channel_coll = db.data_Youtube_Channel.find({})
+        channel_coll = db.data_Youtube_Channel.find({"Channel_Name.Channel_Id":Channel_Id }, {})
+        for document in channel_coll:
+            channel = {"Channel_Name": document['Channel_Name']['Channel_Name'],
+                       "Channel_Id": document['Channel_Name']['Channel_Id'],
+                       "Subscription_Count": document['Channel_Name']['Subscription_Count'],
+                       "Channel_Views": document['Channel_Name']['Channel_Views'],
+                       "Channel_Description": document['Channel_Name']['Channel_Description'],
+                       "Playlist_Id" : document['Channel_Name']['Playlist_Id']
+                       }
+            list_channel_cur.append(channel)
+        # print(f"Channel Name: {channel_name}")
+        # print(f"Channel Id: {channel_id}")
+        # print(f"Subscription Count: {subscription_count}")
+        # print(f"Channel Views: {channel_views}")
+        # print(f"Channel Description: {channel_description}")
+        # print(f"Playlist Id: {playlist_id}")
+        # print(list_channel_cur)
+        # # # Converting to the DataFrame
+        df_channel = pd.DataFrame(list_channel_cur)
+        # df_channel.drop(df_channel.columns[5], axis=1, inplace=True)
+        # print(df_channel)
 
-    #insert channel data into mysql table
-    mysql_db_connector= mysql.connector.connect(
-    host="localhost",user="root",password="mysql@123",auth_plugin='mysql_native_password',database="data_science",charset='utf8mb4'
-    )
-    #print(mysql_db_connector)
+        #creating playlist
+        Playlist_id=document['Channel_Name']['Playlist_Id']
 
-    mysql_db_cursor = mysql_db_connector.cursor()
-    sql='''create table IF NOT EXISTS Channel (
-    Channel_id varchar(255) NOT NULL, 
-    channel_name varchar(255),
-    Subscription_Count int,
-    channel_views int, 
-    channel_description text, 
-    PRIMARY KEY (Channel_id)
-    )
-    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
-    '''
-    mysql_db_cursor.execute(sql)
+        #insert channel data into mysql table
+        mysql_db_connector= mysql.connector.connect(
+        host="localhost",user="root",password="mysql@123",auth_plugin='mysql_native_password',database="data_science",charset='utf8mb4'
+        )
+        #print(mysql_db_connector)
 
-    df_channel=df_channel.fillna(0)
-    for i,row in df_channel.iterrows():
-        sql1 = 'insert into Channel(Channel_Name,Channel_Id, Subscription_Count,Channel_Views, Channel_Description) values (%s, %s, %s, %s, %s)'
-        mysql_db_cursor.execute(sql1,tuple(row))
-        mysql_db_connector.commit()
-    print(mysql_db_cursor.rowcount, "details inserted")
-    # disconnecting from server
-    mysql_db_connector.close()
-
-    #video dataframe
-    pd.set_option('display.max_columns', 20)
-    pd.set_option('display.width', 2000)
-    Video_coll = {}
-    list_video_cur = []
-    for obj in db.data_Youtube_Channel.find({}, {'_id': 0, 'Channel_Name': 0}):
-        Video_coll.update(obj)
-
-    # print(Video_coll)
-        for document in Video_coll.values():
-            Video = {
-                "Video_Id": document['Video_Id'],
-                "Video_Name": document['Video_Name'],
-                "Video_Description": document['Video_Description'],
-                "PublishedAt": document['PublishedAt'],
-                "View_Count": document['View_Count'],
-                "Like_Count": document['Like_Count'],
-                "Favorite_Count": document['Favorite_Count'],
-                "Duration": document['Duration'],
-                "Thumbnail": document['Thumbnail'],
-                "Caption_Status": document['Caption_Status']
-            }
-            list_video_cur.append(Video)
-
-    # Converting to the DataFrame
-    df_video = pd.DataFrame(list_video_cur)
-    # print(df_video)
-    # adding new columns in video dataframe
-    Playlist_id = np.array([])
-    dislike_count = np.array([])
-    comment_count = np.array([])
-    df_video['dislike_count'] = pd.Series(dislike_count)
-    df_video['comment_count'] = pd.Series(comment_count)
-    df_video['PublishedAt'] = pd.to_datetime(df_video['PublishedAt']).dt.date
-    df_video['Playlist_id'] = pd.Series(Playlist_id)
-    # print(df_video.dtypes)
-    # print(df_video.count())
-
-    # insert video data into mysql table
-    mysql_db_connector = mysql.connector.connect(
-        host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
-        database="data_science", charset='utf8mb4')
-    # print(mysql_db_connector)
-    try:
         mysql_db_cursor = mysql_db_connector.cursor()
-        sql = '''create table IF NOT EXISTS Video (
-        Video_id varchar(255) NOT NULL,
-        Playlist_id varchar(255), 
-        Video_name text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
-        Video_description text,
-        published_date datetime,
-        view_count int,
-        like_count int,
-        dislike_count int,
-        favorite_count int,
-        comment_count int,
-        duration varchar(255), 
-        thumbnail varchar(255), 
-        caption_status varchar(255), 
-        PRIMARY KEY (Video_id)
-        -- ,FOREIGN KEY (Playlist_id) REFERENCES Playlist(Playlist_id)
+        sql='''create table IF NOT EXISTS Channel (
+        Channel_id varchar(255) NOT NULL, 
+        Channel_name varchar(255),
+        Subscription_Count int,
+        Channel_views int, 
+        Channel_description text, 
+        Playlist_Id varchar(255),
+        PRIMARY KEY (Channel_id)
         )
         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
         '''
         mysql_db_cursor.execute(sql)
 
-        df_video = df_video.fillna(0)
-        for i, row in df_video.iterrows():
-            sql1 = '''insert into Video(Video_id, Video_name,Video_description,published_date,view_count,like_count,
-                      favorite_count,duration,thumbnail,caption_status,dislike_count,comment_count,Playlist_id)
-                      values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+        df_channel=df_channel.fillna(0)
+        #st.dataframe(df_channel)
+        for i,row in df_channel.iterrows():
+            sql1 = 'insert into Channel(Channel_Name,Channel_Id, Subscription_Count,Channel_Views, Channel_Description,Playlist_Id) values (%s, %s, %s, %s, %s, %s)'
+            mysql_db_cursor.execute(sql1,tuple(row))
+            mysql_db_connector.commit()
+        print(mysql_db_cursor.rowcount, "details inserted")
+        # disconnecting from server
+        mysql_db_connector.close()
+
+        #video dataframe
+        #st.write(Playlist_id)
+        pd.set_option('display.max_columns', 20)
+        pd.set_option('display.width', 2000)
+        Video_coll = {}
+        list_video_cur = []
+        #for obj in db.data_Youtube_Channel.find({}, {'_id': 0, 'Channel_Name': 0}):
+        for obj in db.data_Youtube_Channel.find({"Channel_Name.Channel_Id": Channel_Id},{'_id': 0, 'Channel_Name': 0}):
+            Video_coll.update(obj)
+
+        # print(Video_coll)
+            for document in Video_coll.values():
+                Video = {
+                    "Video_Id": document['Video_Id'],
+                    "Video_Name": document['Video_Name'],
+                    "Video_Description": document['Video_Description'],
+                    "PublishedAt": document['PublishedAt'],
+                    "View_Count": document['View_Count'],
+                    "Like_Count": document['Like_Count'],
+                    "Favorite_Count": document['Favorite_Count'],
+                    "Duration": document['Duration'],
+                    "Thumbnail": document['Thumbnail'],
+                    "Caption_Status": document['Caption_Status']
+                }
+                list_video_cur.append(Video)
+
+        # Converting to the DataFrame
+        df_video = pd.DataFrame(list_video_cur)
+
+        # print(df_video)
+        # adding new columns in video dataframe
+        # Playlist_id = np.array([])
+        dislike_count = np.array([])
+        comment_count = np.array([])
+        df_video['dislike_count'] = pd.Series(dislike_count)
+        df_video['comment_count'] = pd.Series(comment_count)
+
+        df_video['PublishedAt'] = pd.to_datetime(df_video['PublishedAt']).dt.date
+        #df_video['Playlist_id'] = pd.Series(Playlist_id)
+        df_video['Playlist_id']=Playlist_id
+        # print(df_video.dtypes)
+        # print(df_video.count())
+
+        # insert video data into mysql table
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science", charset='utf8mb4')
+        # print(mysql_db_connector)
+        try:
+            mysql_db_cursor = mysql_db_connector.cursor()
+            sql = '''create table IF NOT EXISTS Video (
+            Video_id varchar(255) NOT NULL,
+            Playlist_id varchar(255), 
+            Video_name text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+            Video_description text,
+            published_date datetime,
+            view_count int,
+            like_count int,
+            dislike_count int,
+            favorite_count int,
+            comment_count int,
+            duration varchar(255), 
+            thumbnail varchar(255), 
+            caption_status varchar(255), 
+            PRIMARY KEY (Video_id)
+            -- FOREIGN KEY (Playlist_id) REFERENCES Channel(Playlist_Id)
+            )
+            CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            '''
+            mysql_db_cursor.execute(sql)
+
+            df_video = df_video.fillna(0)
+            for i, row in df_video.iterrows():
+                sql1 = '''insert into Video(Video_id, Video_name,Video_description,published_date,view_count,like_count,
+                          favorite_count,duration,thumbnail,caption_status,dislike_count,comment_count,Playlist_id)
+                          values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+                mysql_db_cursor.execute(sql1, tuple(row))
+                mysql_db_connector.commit()
+            print(mysql_db_cursor.rowcount, "details inserted")
+            # disconnecting from server
+            mysql_db_connector.close()
+
+        except:
+            mysql_db_connector.close()
+
+        # videocomment dataframe
+        pd.set_option('display.max_columns', 20)
+        pd.set_option('display.width', 2000)
+        list_comm_cur = []
+        # print(Video_coll)
+        for video_id in Video_coll:
+            comments_none = Video_coll[video_id]['Comments']
+            #    print(comments)
+            if comments_none is not None:
+                comments = {key: value for key, value in comments_none.items()
+                            if value is not None
+                            }
+                # print(comments)
+                for comment_id in comments:
+                    #        print(comment_id)
+                    comment = comments[comment_id]
+                    #         print(comment)
+                    comm = {
+                        "Video_Id": Video_coll[video_id]['Video_Id'],
+                        "Comment_Id": comment['Comment_Id'],
+                        "Comment_Text": comment['Comment_Text'],
+                        "Comment_Author": comment['Comment_Author'],
+                        "Comment_PublishedAt": comment['Comment_PublishedAt']
+                    }
+                #             break
+                #             print(comm)
+
+                    list_comm_cur.append(comm)
+        #         print(list_comm_cur)
+        #         break
+
+        # # Converting to the DataFrame
+        df_videocomm = pd.DataFrame(list_comm_cur)
+        df_videocomm['Comment_PublishedAt'] = pd.to_datetime(df_videocomm['Comment_PublishedAt']).dt.date
+        df_videocomm = df_videocomm.drop_duplicates()
+        # print(df_videocomm.count())
+
+        # insert videocomment data into mysql table
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science", charset='utf8mb4'
+        )
+        # print(mysql_db_connector)
+
+        mysql_db_cursor = mysql_db_connector.cursor()
+        sql = 'create table IF NOT EXISTS Comment (Comment_id varchar(255) NOT NULL, Video_id varchar(255), Comment_Text text, Comment_author varchar(255), Comment_Published_date datetime, PRIMARY KEY (Comment_id), FOREIGN KEY (Video_id) REFERENCES Video(Video_id))'
+        mysql_db_cursor.execute(sql)
+        # df_videocomm_sample=df_videocomm.sample(25)
+        df_videocomm = df_videocomm.fillna(0)
+        for i, row in df_videocomm.iterrows():
+            sql1 = 'insert into Comment( Video_id, Comment_id, Comment_Text,Comment_author, Comment_Published_date) values (%s, %s, %s, %s, %s)'
             mysql_db_cursor.execute(sql1, tuple(row))
             mysql_db_connector.commit()
         print(mysql_db_cursor.rowcount, "details inserted")
         # disconnecting from server
         mysql_db_connector.close()
 
+        st.write("Data migrated Successfully")
+
+questions=['None',
+'What are the names of all the videos and their corresponding channels?',
+'Which channels have the most number of videos, and how many videos do they have?',
+'What are the top 10 most viewed videos and their respective channels?',
+'How many comments were made on each video, and what are their  corresponding video names?',
+'Which videos have the highest number of likes, and what are their corresponding channel names?',
+'What is the total number of likes and dislikes for each video, and what are their corresponding video names?',
+'What is the total number of views for each channel, and what are their corresponding channel names?',
+'What are the names of all the channels that have published videos in the year  2022?',
+'What is the average duration of all videos in each channel, and what are their corresponding channel names?',
+'Which videos have the highest number of comments, and what are their corresponding channel names?'
+]
+
+# Create a dictionary to store the question-key mapping
+question_dict = {question: index for index, question in enumerate(questions)}
+
+# Create a select box with questions as options
+selected_question = st.selectbox("Select a question", questions,index=0)
+
+# Get the selected key (number) based on the question
+selected_key = question_dict[selected_question]
+
+# Display the selected question and key
+st.write("Selected question:", selected_question)
+st.write("Corresponding key:", selected_key)
+
+if(selected_key==1):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+        sql = "select distinct VD.Video_name,CH.Channel_name from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id"
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Video_name', 'Channel_name']))
+        mysql_db_connector.close()
+
+
     except:
         mysql_db_connector.close()
 
-    # videocomment dataframe
-    pd.set_option('display.max_columns', 20)
-    pd.set_option('display.width', 2000)
-    list_comm_cur = []
-    # print(Video_coll)
-    for video_id in Video_coll:
-        comments_none = Video_coll[video_id]['Comments']
-        #    print(comments)
-        if comments_none is not None:
-            comments = {key: value for key, value in comments_none.items()
-                        if value is not None
-                        }
-            # print(comments)
-            for comment_id in comments:
-                #        print(comment_id)
-                comment = comments[comment_id]
-                #         print(comment)
-                comm = {
-                    "Video_Id": Video_coll[video_id]['Video_Id'],
-                    "Comment_Id": comment['Comment_Id'],
-                    "Comment_Text": comment['Comment_Text'],
-                    "Comment_Author": comment['Comment_Author'],
-                    "Comment_PublishedAt": comment['Comment_PublishedAt']
-                }
-            #             break
-            #             print(comm)
+elif(selected_key==2):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
 
-                list_comm_cur.append(comm)
-    #         print(list_comm_cur)
-    #         break
+        sql = '''select CH.Channel_name,count(VD.Video_id) as Video_count from Channel CH inner join Video VD 
+              on CH.Playlist_Id= VD.Playlist_id group by CH.Channel_name order by count(VD.Video_id) desc limit 1'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_count']))
+        mysql_db_connector.close()
 
-    # # Converting to the DataFrame
-    df_videocomm = pd.DataFrame(list_comm_cur)
-    df_videocomm['Comment_PublishedAt'] = pd.to_datetime(df_videocomm['Comment_PublishedAt']).dt.date
-    df_videocomm = df_videocomm.drop_duplicates()
-    # print(df_videocomm.count())
 
-    # insert videocomment data into mysql table
-    mysql_db_connector = mysql.connector.connect(
-        host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
-        database="data_science", charset='utf8mb4'
-    )
-    # print(mysql_db_connector)
+    except:
+        mysql_db_connector.close()
 
-    mysql_db_cursor = mysql_db_connector.cursor()
-    sql = 'create table IF NOT EXISTS Comment (Comment_id varchar(255) NOT NULL, Video_id varchar(255), Comment_Text text, Comment_author varchar(255), Comment_Published_date datetime, PRIMARY KEY (Comment_id), FOREIGN KEY (Video_id) REFERENCES Video(Video_id))'
-    mysql_db_cursor.execute(sql)
-    # df_videocomm_sample=df_videocomm.sample(25)
-    df_videocomm = df_videocomm.fillna(0)
-    for i, row in df_videocomm.iterrows():
-        sql1 = 'insert into Comment( Video_id, Comment_id, Comment_Text,Comment_author, Comment_Published_date) values (%s, %s, %s, %s, %s)'
-        mysql_db_cursor.execute(sql1, tuple(row))
-        mysql_db_connector.commit()
-    print(mysql_db_cursor.rowcount, "details inserted")
-    # disconnecting from server
-    mysql_db_connector.close()
+elif(selected_key==3):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''select t.Channel_name,t.view_count from (
+              SELECT CH.Channel_name,VD.view_count,
+              ROW_NUMBER() OVER ( PARTITION BY CH.Channel_name ORDER BY VD.view_count desc) row_num
+              from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id ) t where t.row_num <= 10'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'view_count']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
+
+# elif(selected_key==4):
+#     try:
+#         mysql_db_connector = mysql.connector.connect(
+#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+#             database="data_science")
+#         # print(mysql_db_connector)
+#         mysql_cursor = mysql_db_connector.cursor()
+#
+#         sql = ''''''
+#         mysql_cursor.execute(sql)
+#         rows = mysql_cursor.fetchall()
+#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'view_count']))
+#         mysql_db_connector.close()
+#
+#
+#     except:
+#         mysql_db_connector.close()
+
+elif(selected_key==5):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''SELECT CH.Channel_name,VD.like_count from Channel CH inner join Video VD 
+                on CH.Playlist_Id= VD.Playlist_id order by VD.like_count desc limit 10'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'like_count']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
+
+elif(selected_key==6):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''select Video_name,like_count,dislike_count from Video '''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Video_name', 'like_count','dislike_count']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
+
+elif(selected_key==7):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''SELECT Channel_name,Channel_views from Channel'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Channel_views']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
+
+# elif(selected_key==8):
+#     try:
+#         mysql_db_connector = mysql.connector.connect(
+#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+#             database="data_science")
+#         # print(mysql_db_connector)
+#         mysql_cursor = mysql_db_connector.cursor()
+#
+#         sql = ''''''
+#         mysql_cursor.execute(sql)
+#         rows = mysql_cursor.fetchall()
+#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
+#         mysql_db_connector.close()
+#
+#
+#     except:
+#         mysql_db_connector.close()
+#
+# elif(selected_key==9):
+#     try:
+#         mysql_db_connector = mysql.connector.connect(
+#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+#             database="data_science")
+#         # print(mysql_db_connector)
+#         mysql_cursor = mysql_db_connector.cursor()
+#
+#         sql = ''''''
+#         mysql_cursor.execute(sql)
+#         rows = mysql_cursor.fetchall()
+#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
+#         mysql_db_connector.close()
+#
+#
+#     except:
+#         mysql_db_connector.close()
+
+elif(selected_key==10):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''select Channel_name,Video_name,No_comments from
+                (SELECT CH.Channel_name,VD.Video_name,count(Comment_id) as No_comments  from Channel CH 
+                inner join Video VD on CH.Playlist_Id= VD.Playlist_id inner join Comment CO on VD.Video_id=CO.Video_id 
+                group by CH.Channel_name,VD.Video_name ) x order by No_comments desc'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
