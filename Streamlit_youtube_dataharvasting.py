@@ -128,6 +128,42 @@ def get_video_details(youtube, video_ids):
         # return response
 
         for video in response['items']:
+            # Check if view count is available
+            if 'viewCount' in video['statistics']:
+                View_Count = video['statistics']['viewCount']
+            else:
+                View_Count = 0
+
+            # Check if favorite count is available
+            if 'favoriteCount' in video['statistics']:
+                Favorite_Count = video['statistics']['favoriteCount']
+            else:
+                Favorite_Count = 0
+
+            # Check if like count is available
+            if 'likeCount' in video['statistics']:
+                Like_Count = video['statistics']['likeCount']
+            else:
+                Like_Count = 0
+
+            # Check if dislike count is available
+            if 'dislikeCount' in video['statistics']:
+                dislike_count = video['statistics']['dislikeCount']
+            else:
+                dislike_count = 0
+
+            # Check if comment count is available
+            if 'commentCount' in video['statistics']:
+                comment_count = video['statistics']['commentCount']
+            else:
+                comment_count = None
+
+            # video duration
+            video_duration = video['contentDetails']['duration']
+            # Parse the duration string
+            duration_parts = video_duration.split('T')[1].split('M')
+            minutes = int(duration_parts[0])
+
             video_stats = {
                 "Video_Id_" + str(i + 1):
                     dict
@@ -137,12 +173,18 @@ def get_video_details(youtube, video_ids):
                         Video_Description=video['snippet']['description'],
                         # Tags= video['snippet']['tags'],
                         PublishedAt=video['snippet']['publishedAt'],
-                        View_Count=video['statistics']['viewCount'],
-                        Like_Count=video['statistics']['likeCount'],
-                        #Dislike_Count= video['statistics']['dislikeCount'],
-                        Favorite_Count=video['statistics']['favoriteCount'],
-                        #Comment_Count= video['statistics']['commentCount'],
-                        Duration=video['contentDetails']['duration'],
+                        # View_Count = video['statistics']['viewCount'],
+                        View_Count=View_Count,
+                        # Like_Count= video['statistics']['likeCount'],
+                        Like_Count=Like_Count,
+                        # Dislike_Count= video['statistics']['dislikeCount'],
+                        Dislike_Count=dislike_count,
+                        # Favorite_Count= video['statistics']['favoriteCount'],
+                        Favorite_Count=Favorite_Count,
+                        # Comment_Count= video['statistics']['commentCount'],
+                        Comment_Count=comment_count,
+                        #Duration=video['contentDetails']['duration'],
+                        Duration=minutes,
                         Thumbnail=video['snippet']['thumbnails']['default']['url'],
                         Caption_Status=video['contentDetails']['caption'],
                         Comments=get_comment_videoinfo(youtube, video_ids[i])
@@ -237,7 +279,7 @@ if(st.button('Get channel details')):
 
 
 if(st.button("Data migrate from mongodb to mysql")):
-    # channel dataframe
+    #channel dataframe
     for Channel_Id in selected_channel_ids:
         #st.write(Channel_Id)
         pd.set_option('display.max_columns', 20)
@@ -305,7 +347,9 @@ if(st.button("Data migrate from mongodb to mysql")):
         pd.set_option('display.width', 2000)
         Video_coll = {}
         list_video_cur = []
+
         #for obj in db.data_Youtube_Channel.find({}, {'_id': 0, 'Channel_Name': 0}):
+
         for obj in db.data_Youtube_Channel.find({"Channel_Name.Channel_Id": Channel_Id},{'_id': 0, 'Channel_Name': 0}):
             Video_coll.update(obj)
 
@@ -321,20 +365,22 @@ if(st.button("Data migrate from mongodb to mysql")):
                     "Favorite_Count": document['Favorite_Count'],
                     "Duration": document['Duration'],
                     "Thumbnail": document['Thumbnail'],
-                    "Caption_Status": document['Caption_Status']
+                    "Caption_Status": document['Caption_Status'],
+                    "dislike_count": document['Dislike_Count'],
+                    "comment_count": document['Comment_Count']
                 }
                 list_video_cur.append(Video)
 
         # Converting to the DataFrame
         df_video = pd.DataFrame(list_video_cur)
 
-        # print(df_video)
+        #print(df_video)
         # adding new columns in video dataframe
         # Playlist_id = np.array([])
-        dislike_count = np.array([])
-        comment_count = np.array([])
-        df_video['dislike_count'] = pd.Series(dislike_count)
-        df_video['comment_count'] = pd.Series(comment_count)
+        # dislike_count = np.array([])
+        # comment_count = np.array([])
+        # df_video['dislike_count'] = pd.Series(dislike_count)
+        # df_video['comment_count'] = pd.Series(comment_count)
 
         df_video['PublishedAt'] = pd.to_datetime(df_video['PublishedAt']).dt.date
         #df_video['Playlist_id'] = pd.Series(Playlist_id)
@@ -451,7 +497,7 @@ questions=['None',
 'Which videos have the highest number of likes, and what are their corresponding channel names?',
 'What is the total number of likes and dislikes for each video, and what are their corresponding video names?',
 'What is the total number of views for each channel, and what are their corresponding channel names?',
-'What are the names of all the channels that have published videos in the year  2022?',
+'What are the names of all the channels that have published videos in the year  2023?',
 'What is the average duration of all videos in each channel, and what are their corresponding channel names?',
 'Which videos have the highest number of comments, and what are their corresponding channel names?'
 ]
@@ -466,8 +512,8 @@ selected_question = st.selectbox("Select a question", questions,index=0)
 selected_key = question_dict[selected_question]
 
 # Display the selected question and key
-st.write("Selected question:", selected_question)
-st.write("Corresponding key:", selected_key)
+# st.write("Selected question:", selected_question)
+# st.write("Corresponding key:", selected_key)
 
 if(selected_key==1):
     try:
@@ -476,10 +522,10 @@ if(selected_key==1):
             database="data_science")
         # print(mysql_db_connector)
         mysql_cursor = mysql_db_connector.cursor()
-        sql = "select distinct VD.Video_name,CH.Channel_name from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id"
+        sql = "select distinct CH.Channel_name,VD.Video_name from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id"
         mysql_cursor.execute(sql)
         rows = mysql_cursor.fetchall()
-        st.dataframe(pd.DataFrame(rows, columns=['Video_name', 'Channel_name']))
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name','Video_name']))
         mysql_db_connector.close()
 
 
@@ -513,36 +559,36 @@ elif(selected_key==3):
         # print(mysql_db_connector)
         mysql_cursor = mysql_db_connector.cursor()
 
-        sql = '''select t.Channel_name,t.view_count from (
+        sql = '''select t.Channel_name,t.View_count from (
               SELECT CH.Channel_name,VD.view_count,
               ROW_NUMBER() OVER ( PARTITION BY CH.Channel_name ORDER BY VD.view_count desc) row_num
               from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id ) t where t.row_num <= 10'''
         mysql_cursor.execute(sql)
         rows = mysql_cursor.fetchall()
-        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'view_count']))
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'View_count']))
         mysql_db_connector.close()
 
 
     except:
         mysql_db_connector.close()
 
-# elif(selected_key==4):
-#     try:
-#         mysql_db_connector = mysql.connector.connect(
-#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
-#             database="data_science")
-#         # print(mysql_db_connector)
-#         mysql_cursor = mysql_db_connector.cursor()
-#
-#         sql = ''''''
-#         mysql_cursor.execute(sql)
-#         rows = mysql_cursor.fetchall()
-#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'view_count']))
-#         mysql_db_connector.close()
-#
-#
-#     except:
-#         mysql_db_connector.close()
+elif(selected_key==4):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = 'select Video_name,comment_count from Video order by comment_count desc'
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Video_name', 'comment_count']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
 
 elif(selected_key==5):
     try:
@@ -571,7 +617,7 @@ elif(selected_key==6):
         # print(mysql_db_connector)
         mysql_cursor = mysql_db_connector.cursor()
 
-        sql = '''select Video_name,like_count,dislike_count from Video '''
+        sql = 'select Video_name,like_count,dislike_count from Video'
         mysql_cursor.execute(sql)
         rows = mysql_cursor.fetchall()
         st.dataframe(pd.DataFrame(rows, columns=['Video_name', 'like_count','dislike_count']))
@@ -599,41 +645,43 @@ elif(selected_key==7):
     except:
         mysql_db_connector.close()
 
-# elif(selected_key==8):
-#     try:
-#         mysql_db_connector = mysql.connector.connect(
-#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
-#             database="data_science")
-#         # print(mysql_db_connector)
-#         mysql_cursor = mysql_db_connector.cursor()
-#
-#         sql = ''''''
-#         mysql_cursor.execute(sql)
-#         rows = mysql_cursor.fetchall()
-#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
-#         mysql_db_connector.close()
-#
-#
-#     except:
-#         mysql_db_connector.close()
-#
-# elif(selected_key==9):
-#     try:
-#         mysql_db_connector = mysql.connector.connect(
-#             host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
-#             database="data_science")
-#         # print(mysql_db_connector)
-#         mysql_cursor = mysql_db_connector.cursor()
-#
-#         sql = ''''''
-#         mysql_cursor.execute(sql)
-#         rows = mysql_cursor.fetchall()
-#         st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
-#         mysql_db_connector.close()
-#
-#
-#     except:
-#         mysql_db_connector.close()
+elif(selected_key==8):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''SELECT distinct CH.Channel_name from Channel CH inner join Video VD 
+                on CH.Playlist_Id= VD.Playlist_id where year(VD.published_date)=2023'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name']))
+        mysql_db_connector.close()
+
+    except:
+        mysql_db_connector.close()
+
+elif(selected_key==9):
+    try:
+        mysql_db_connector = mysql.connector.connect(
+            host="localhost", user="root", password="mysql@123", auth_plugin='mysql_native_password',
+            database="data_science")
+        # print(mysql_db_connector)
+        mysql_cursor = mysql_db_connector.cursor()
+
+        sql = '''SELECT CH.Channel_name,avg(VD.duration) as Avg_duration
+                from Channel CH inner join Video VD on CH.Playlist_Id= VD.Playlist_id 
+                group by CH.Channel_name'''
+        mysql_cursor.execute(sql)
+        rows = mysql_cursor.fetchall()
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Avg_duration']))
+        mysql_db_connector.close()
+
+
+    except:
+        mysql_db_connector.close()
 
 elif(selected_key==10):
     try:
@@ -643,13 +691,13 @@ elif(selected_key==10):
         # print(mysql_db_connector)
         mysql_cursor = mysql_db_connector.cursor()
 
-        sql = '''select Channel_name,Video_name,No_comments from
-                (SELECT CH.Channel_name,VD.Video_name,count(Comment_id) as No_comments  from Channel CH 
+        sql = '''select Channel_name,Video_name,Num_of_comments from
+                (SELECT CH.Channel_name,VD.Video_name,count(Comment_id) as Num_of_comments  from Channel CH 
                 inner join Video VD on CH.Playlist_Id= VD.Playlist_id inner join Comment CO on VD.Video_id=CO.Video_id 
-                group by CH.Channel_name,VD.Video_name ) x order by No_comments desc'''
+                group by CH.Channel_name,VD.Video_name ) x order by Num_of_comments desc'''
         mysql_cursor.execute(sql)
         rows = mysql_cursor.fetchall()
-        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'No_comments']))
+        st.dataframe(pd.DataFrame(rows, columns=['Channel_name', 'Video_name', 'Num_of_comments']))
         mysql_db_connector.close()
 
 
